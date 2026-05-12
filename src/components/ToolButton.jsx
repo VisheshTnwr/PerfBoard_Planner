@@ -1,5 +1,3 @@
-import React from 'react';
-
 const ToolButton = ({ active, onClick, icon, label }) => (
   <button
     onClick={onClick}

@@ -1,23 +1,20 @@
-import React from 'react';
 import { HOLE_SPACING } from '../constants';
 
-const ComponentRenderer = ({ comp, tool, onDelete, onDrag, onContextMenu }) => {
+const ComponentRenderer = ({ comp, tool, onDelete, onContextMenu }) => {
   if (comp.type === 'resistor') {
-    const isHorizontal = Math.abs(comp.end.x - comp.start.x) > Math.abs(comp.end.y - comp.start.y);
-    const endX = isHorizontal ? comp.end.x : comp.start.x;
-    const endY = isHorizontal ? comp.start.y : comp.end.y;
-
-    const angle = isHorizontal ? 0 : 90;
+    const dx = comp.end.x - comp.start.x;
+    const dy = comp.end.y - comp.start.y;
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    
     const bodyWidth = 40;
-    const bodyX = comp.start.x + (endX - comp.start.x) * comp.bodyPos;
-    const bodyY = comp.start.y + (endY - comp.start.y) * comp.bodyPos;
+    const bodyX = comp.start.x + dx * comp.bodyPos;
+    const bodyY = comp.start.y + dy * comp.bodyPos;
 
     return (
       <g className={tool === 'delete' ? 'hover:opacity-50 cursor-pointer' : ''} onClick={() => tool === 'delete' && onDelete()}>
-        <line x1={comp.start.x} y1={comp.start.y} x2={endX} y2={endY} stroke="#aaa" strokeWidth="2" />
+        <line x1={comp.start.x} y1={comp.start.y} x2={comp.end.x} y2={comp.end.y} stroke="#aaa" strokeWidth="2" />
         <g 
           transform={`translate(${bodyX}, ${bodyY}) rotate(${angle})`}
-          onMouseDown={(e) => { if (tool === 'edit') { e.stopPropagation(); onDrag('body'); } }}
           className={tool === 'edit' ? 'cursor-move' : ''}
         >
           <rect x={-bodyWidth/2} y="-8" width={bodyWidth} height="16" fill="#d2b48c" rx="4" stroke="#8b4513" strokeWidth="0.5" />
@@ -27,9 +24,139 @@ const ComponentRenderer = ({ comp, tool, onDelete, onDrag, onContextMenu }) => {
         </g>
         {tool === 'edit' && (
           <>
-            <circle cx={comp.start.x} cy={comp.start.y} r="8" fill="white" fillOpacity="0.4" stroke="white" onMouseDown={(e) => { e.stopPropagation(); onDrag('start'); }} className="cursor-move" />
-            <circle cx={endX} cy={endY} r="8" fill="white" fillOpacity="0.4" stroke="white" onMouseDown={(e) => { e.stopPropagation(); onDrag('end'); }} className="cursor-move" />
+            <circle cx={comp.start.x} cy={comp.start.y} r="8" fill="white" fillOpacity="0.4" stroke="white" className="cursor-move" />
+            <circle cx={comp.end.x} cy={comp.end.y} r="8" fill="white" fillOpacity="0.4" stroke="white" className="cursor-move" />
           </>
+        )}
+      </g>
+    );
+  }
+
+  if (comp.type === 'capacitor') {
+    const dx = comp.end.x - comp.start.x;
+    const dy = comp.end.y - comp.start.y;
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    const len = Math.sqrt(dx * dx + dy * dy);
+    
+    // Calculate perpendicular offset for labels
+    const ux = dx / (len || 1);
+    const uy = dy / (len || 1);
+    const px = -uy;
+    const py = ux;
+    const labelOffset = 12;
+
+    const bodyWidth = 30;
+    const bodyX = comp.start.x + dx * comp.bodyPos;
+    const bodyY = comp.start.y + dy * comp.bodyPos;
+
+    return (
+      <g className={tool === 'delete' ? 'hover:opacity-50 cursor-pointer' : ''} onClick={() => tool === 'delete' && onDelete()}>
+        <line x1={comp.start.x} y1={comp.start.y} x2={comp.end.x} y2={comp.end.y} stroke="#aaa" strokeWidth="2" />
+        
+        {/* Polarity Labels */}
+        <text 
+          x={comp.start.x + px * labelOffset} 
+          y={comp.start.y + py * labelOffset} 
+          fill="#4ade80" 
+          fontSize="14" 
+          fontWeight="black" 
+          textAnchor="middle" 
+          dominantBaseline="middle"
+          style={{ pointerEvents: 'none', textShadow: '0 0 2px rgba(0,0,0,0.5)' }}
+        >
+          +
+        </text>
+        <text 
+          x={comp.end.x + px * labelOffset} 
+          y={comp.end.y + py * labelOffset} 
+          fill="#f87171" 
+          fontSize="16" 
+          fontWeight="black" 
+          textAnchor="middle" 
+          dominantBaseline="middle"
+          style={{ pointerEvents: 'none', textShadow: '0 0 2px rgba(0,0,0,0.5)' }}
+        >
+          -
+        </text>
+
+        <g 
+          transform={`translate(${bodyX}, ${bodyY}) rotate(${angle})`}
+          className={tool === 'edit' ? 'cursor-move' : ''}
+        >
+          {/* Electrolytic Body */}
+          <rect x={-bodyWidth/2} y="-10" width={bodyWidth} height="20" fill="#0066cc" rx="2" stroke="#004488" strokeWidth="0.5" />
+          <rect x={bodyWidth/2 - 8} y="-10" width="6" height="20" fill="#ddd" opacity="0.3" />
+          <text y="3" fill="white" fontSize="7" fontWeight="bold" textAnchor="middle" style={{ pointerEvents: 'none' }}>10μF</text>
+        </g>
+        
+        {tool === 'edit' && (
+          <>
+            <circle cx={comp.start.x} cy={comp.start.y} r="8" fill="white" fillOpacity="0.4" stroke="white" className="cursor-move" />
+            <circle cx={comp.end.x} cy={comp.end.y} r="8" fill="white" fillOpacity="0.4" stroke="white" className="cursor-move" />
+          </>
+        )}
+      </g>
+    );
+  }
+
+  if (comp.type === 'button') {
+    const width = 2 * HOLE_SPACING;
+    const height = 6 * HOLE_SPACING;
+    const pinOffsets = [
+      { x: 0, y: 0 },
+      { x: width, y: 0 },
+      { x: 0, y: height },
+      { x: width, y: height }
+    ];
+
+    return (
+      <g 
+        className={`${tool === 'delete' ? 'hover:opacity-50 cursor-pointer' : ''} ${tool === 'edit' ? 'cursor-move' : ''}`}
+        onClick={() => tool === 'delete' && onDelete()}
+      >
+        {/* Button Leads/Pins */}
+        {pinOffsets.map((off, i) => (
+          <line 
+            key={i}
+            x1={comp.pos.x + off.x} 
+            y1={comp.pos.y + off.y} 
+            x2={comp.pos.x + (off.x === 0 ? 5 : -5) + off.x}
+            y2={comp.pos.y + off.y}
+            stroke="#ccc" 
+            strokeWidth="2" 
+          />
+        ))}
+
+        {/* Button Body */}
+        <rect 
+          x={comp.pos.x - 5} 
+          y={comp.pos.y - 5} 
+          width={width + 10} 
+          height={height + 10} 
+          fill="#333" 
+          rx="4" 
+          stroke="#555" 
+          strokeWidth="1" 
+        />
+        
+        {/* Push Part */}
+        <circle 
+          cx={comp.pos.x + width/2} 
+          cy={comp.pos.y + height/2} 
+          r={Math.min(width, height) / 3} 
+          fill="#444" 
+          stroke="#666" 
+          strokeWidth="1" 
+        />
+        <circle 
+          cx={comp.pos.x + width/2} 
+          cy={comp.pos.y + height/2} 
+          r={Math.min(width, height) / 4} 
+          fill="#cc0000" 
+        />
+
+        {tool === 'edit' && (
+          <circle cx={comp.pos.x} cy={comp.pos.y} r="8" fill="white" fillOpacity="0.4" stroke="white" className="cursor-move" />
         )}
       </g>
     );
@@ -113,7 +240,7 @@ const ComponentRenderer = ({ comp, tool, onDelete, onDrag, onContextMenu }) => {
         </g>
 
         {tool === 'edit' && (
-          <circle cx={comp.pos.x} cy={comp.pos.y} r="8" fill="white" fillOpacity="0.4" stroke="white" onMouseDown={(e) => { e.stopPropagation(); onDrag('pos'); }} className="cursor-move" />
+          <circle cx={comp.pos.x} cy={comp.pos.y} r="8" fill="white" fillOpacity="0.4" stroke="white" className="cursor-move" />
         )}
       </g>
     );
